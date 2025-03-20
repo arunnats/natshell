@@ -1,10 +1,24 @@
-mod errors;
-
 use errors::CrateResult;
 use tokio::{ // tokio is an asyc runtime module
     io::{AsyncBufReadExt, AsyncWriteExt},
     task::JoinHandle,
 };
+use command::Command;
+
+mod errors;
+mod command;
+
+async fn handle_new_line(line: &str) -> CrateResult<Command> {
+    // leverages the TryFrom trait from command.rs
+    let command: Command = line.try_into()?;
+
+    match command.clone() {
+        // Placeholder
+        _ => {}
+    }
+    Ok(command)
+}
+
 
 fn spawn_user_input_handler() -> JoinHandle<CrateResult<()>> {
     // run the REPL loop in an async task
@@ -20,8 +34,16 @@ fn spawn_user_input_handler() -> JoinHandle<CrateResult<()>> {
         stdout.flush().await?; // Ensure output is shown immediately
         
         while let Ok(Some(line)) = reader.next_line().await { // continuously read user input
-            // log user input
-            println!("User entered: {}", line);
+            let command = handle_new_line(&line).await;
+
+            if let Ok(command) = &command { // if the command matched the enum
+                match command {
+                    _ => {}
+                }
+            } else {
+                eprintln!("Error parsing command: {}", command.err().unwrap()); // else error
+            }
+
             stdout.write_all(b"Natshell > ").await?;
             stdout.flush().await?; // Ensure output is shown immediately
         }
