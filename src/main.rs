@@ -4,17 +4,29 @@ use tokio::{ // tokio is an asyc runtime module
     task::JoinHandle,
 };
 use command::Command;
+use crate::helpers::pwd;
 
 mod errors;
 mod command;
+mod helpers;
 
 async fn handle_new_line(line: &str) -> CrateResult<Command> {
     // leverages the TryFrom trait from command.rs
     let command: Command = line.try_into()?;
 
+    // match the commands here
     match command.clone() {
-        // Placeholder
-        _ => {}
+        Command::Exit => println!("byeeee"),
+        Command::Echo(s) => println!("{}", s),
+        Command::Ls => helpers::ls()?,
+        Command::Pwd => println!("{}", helpers::pwd()?),
+        Command::Cd(s) => helpers::cd(&s)?,
+        Command::Touch(s) => helpers::touch(&s)?,
+        Command::Rm(s) => helpers::rm(&s)?,
+        Command::Cat(s) => {
+            let contents = helpers::cat(&s)?;
+            println!("{}", contents);
+        }
     }
     Ok(command)
 }
@@ -30,21 +42,26 @@ fn spawn_user_input_handler() -> JoinHandle<CrateResult<()>> {
         let mut stdout = tokio::io::BufWriter::new(stdout); // buffered output for improved performance
 
         // output message and wait for user input
-        stdout.write_all(b"Natshell > ").await?;
-        stdout.flush().await?; // Ensure output is shown immediately
+        stdout.write(b"Welcome to Natshell!\n").await?;
+        stdout.write(pwd()?.as_bytes()).await?;
+        stdout.write(b"\nNatshell >").await?;
+        stdout.flush().await?; // ensure output is shown immediately
         
         while let Ok(Some(line)) = reader.next_line().await { // continuously read user input
             let command = handle_new_line(&line).await;
 
             if let Ok(command) = &command { // if the command matched the enum
                 match command {
+                    Command::Exit => {
+                        break;
+                    }
                     _ => {}
                 }
             } else {
                 eprintln!("Error parsing command: {}", command.err().unwrap()); // else error
             }
 
-            stdout.write_all(b"Natshell > ").await?;
+            stdout.write_all(b"\nNatshell > ").await?;
             stdout.flush().await?; // Ensure output is shown immediately
         }
         Ok(())
